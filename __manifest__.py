@@ -7,6 +7,8 @@
     'summary': '',
     'description': """
     """,
-    'depends': ['base'],
-    'data': [],      
+    'depends': ['project_enterprise'],
+    'data': [
+        'views/task_views.xml',
+    ],      
 }
