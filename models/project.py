@@ -7,11 +7,12 @@ class Project(models.Model):
 
     @api.onchange('planned_date_end')
     def _compute_planned_date_begin(self):
-        for task in self:
-            if task.x_studio_expect_time:
-                hours = task.x_studio_expect_time % 1
-                minutes = (task.x_studio_expect_time - hours) * 60
-                task.planned_date_begin = task.planned_date_end - timedelta(hours=hours, minutes=minutes)
+        if 'x_studio_expect_time' in self.env['project.task']._fields:
+            for task in self:
+                if task.x_studio_expect_time:
+                    hours = task.x_studio_expect_time % 1
+                    minutes = (task.x_studio_expect_time - hours) * 60
+                    task.planned_date_begin = task.planned_date_end - timedelta(hours=hours, minutes=minutes)
 
     is_blocking = fields.Boolean(string='Is Blocking', default=True)
 
