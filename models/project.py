@@ -11,12 +11,12 @@ class Project(models.Model):
 
     @api.onchange('planned_date_end')
     def _compute_planned_date_begin(self):
-        for task in self:
-            if task.x_studio_expect_time:
-                print(task, task.x_studio_expect_time, task.planned_date_end)
-                hours = task.x_studio_expect_time % 1
-                minutes = (task.x_studio_expect_time - hours) * 60
-                task.planned_date_begin = task.planned_date_end - timedelta(hours=hours, minutes=minutes)
+        if 'x_studio_expect_time' in self.env['project.task']._fields:
+            for task in self:
+                if task.x_studio_expect_time:
+                    hours = task.x_studio_expect_time % 1
+                    minutes = (task.x_studio_expect_time - hours) * 60
+                    task.planned_date_begin = task.planned_date_end - timedelta(hours=hours, minutes=minutes)
 
     @api.onchange('depend_on_ids')
     def _onchage_depend_on_ids(self):
