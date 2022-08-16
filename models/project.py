@@ -1,53 +1,43 @@
+from unicodedata import name
 from odoo import models, api, fields, _
 from datetime import timedelta
-import datetime as datetime
 
 
 class Project(models.Model):
 
     _inherit = 'project.task'
 
-    no_blocks = fields.Boolean(string='Is Blocked', default=True)
-
-    @api.onchange('planned_date_begin', 'planned_date_end')
+    @api.onchange('planned_date_begin')
     def _foward_schedule_blocked_tasks(self, offsetInit=timedelta(hours=0)):
-        '''
-        if 'x_studio_expect_time' in self.env['project.task']._fields:
-            for task in self:
-                if task.x_studio_expect_time:
-                    hours = task.x_studio_expect_time % 1
-                    minutes = (task.x_studio_expect_time - hours) * 60
-                    task.planned_date_begin = task.planned_date_end - timedelta(hours=hours, minutes=minutes)
-        '''
-        for task in self:
-            offset = timedelta(hours=0) + offsetInit
+        # print('self._ids', self._ids)
 
-            potential_blocks = task.env['project.task'].search([
-                ('id', 'in', task.depend_on_ids.ids)])
-            for potential_block in potential_blocks:
-                print('Foward Scheduling', potential_block.name)
-                if potential_block.stage_id.name != 'Done':
-                    potential_block.planned_date_begin = task.planned_date_end + offset + timedelta(hours=1)
+        g1, g2 = False, False
 
-                    potential_block.planned_date_end = task.planned_date_end + offset + timedelta(hours=potential_block.x_studio_expect_time) + timedelta(hours=1)
-                    offset += timedelta(hours=potential_block.x_studio_expect_time) + timedelta(hours=1)
-                    offsetInit += offset
-                    potential_block._foward_schedule_blocked_tasks(offsetInit=offsetInit)
-    '''
-    @api.onchange('depend_on_ids')
-    def _onchage_depend_on_ids(self):
-        for task in self:
-            potential_blocks = task.env['project.task'].search([
-                ('id', 'in', task.depend_on_ids.ids)])
-            for potential_block in potential_blocks:
-                if potential_block.stage_id.name != 'Done':
-                    task.no_blocks = False
-                    break
-                else:
-                    task.no_blocks = True
-                print(potential_block.stage_id.name)
-            if task.no_blocks:
-                temp_date = fields.Datetime.to_datetime(potential_blocks[0].date_deadline)
-                print('temp date', temp_date)
-                task.write({'planned_date_begin': temp_date})
-    '''
+        for task in self._origin:
+            if task.planned_date_begin:
+                # create a timedelta for the old begin date
+                oldDateBegin = timedelta(days=task.planned_date_begin.day, hours=task.planned_date_begin.hour)
+                g1 = True
+
+        for task in self.browse(self._ids):
+            if task.planned_date_begin and task.x_studio_expect_time:
+                task.write({'planned_date_end': task.planned_date_begin + timedelta(hours=task.x_studio_expect_time)})
+                # create a timedelta for the new begin date
+                newDateBegin = timedelta(days=task.planned_date_begin.day, hours=task.planned_date_begin.hour)
+                g2 = True
+        
+        for task in self.browse(self._ids):
+            if task.planned_date_begin and task.x_studio_expect_time and g1 and g2:
+                # compute time delta between old and new begin date
+                delta = timedelta(hours = (newDateBegin - oldDateBegin).total_seconds() / 3600)
+                # check if delta value is positive or negative
+                if delta > timedelta(hours=0):
+                    for subtask in self.search([('project_id', '=', self.project_id.id)]):
+                        # check if subtask begin date is after newDateBegin
+                        if timedelta(days=subtask.planned_date_begin.day, hours=subtask.planned_date_begin.hour) >= newDateBegin:
+                            # compute new subtask begin date
+                            newSubtaskBegin = subtask.planned_date_begin + delta
+                            # update subtask begin date
+                            subtask.write({'planned_date_begin': newSubtaskBegin})
+                            # update subtask end date
+                            subtask.write({'planned_date_end': newSubtaskBegin + timedelta(hours=subtask.x_studio_expect_time)})
